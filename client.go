@@ -102,15 +102,17 @@ func newClient(serverAddress string, creds credentials.TransportCredentials, cre
 	var opts []grpc.DialOption
 	if creds == nil && credential == nil {
 		opts = append(opts, grpc.WithInsecure())
-	} else {
-		if creds != nil {
-			opts = append(opts, grpc.WithTransportCredentials(creds))
-		}
-		if credential != nil {
-			opts = append(opts, grpc.WithInsecure())
-			// 使用自定义认证
-			opts = append(opts, grpc.WithPerRPCCredentials(credential))
-		}
+	} else if creds != nil && credential != nil {
+		// 使用自定义认证
+		opts = append(opts, grpc.WithPerRPCCredentials(credential))
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else if creds != nil {
+		// TLS
+		opts = append(opts, grpc.WithTransportCredentials(creds))
+	} else if credential != nil {
+		opts = append(opts, grpc.WithInsecure())
+		// 使用自定义认证
+		opts = append(opts, grpc.WithPerRPCCredentials(credential))
 	}
 	conn, err := grpc.Dial(serverAddress, opts...)
 	if err != nil {
