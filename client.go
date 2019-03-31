@@ -100,9 +100,7 @@ func NewClientTLSCustomAuthentication(serverAddress string, cp *x509.CertPool, s
 
 func newClient(serverAddress string, creds credentials.TransportCredentials, credential credentials.PerRPCCredentials) *Client {
 	var opts []grpc.DialOption
-	if creds == nil && credential == nil {
-		opts = append(opts, grpc.WithInsecure())
-	} else if creds != nil && credential != nil {
+	if creds != nil && credential != nil {
 		// 使用自定义认证
 		opts = append(opts, grpc.WithPerRPCCredentials(credential))
 		opts = append(opts, grpc.WithTransportCredentials(creds))
@@ -113,6 +111,8 @@ func newClient(serverAddress string, creds credentials.TransportCredentials, cre
 		opts = append(opts, grpc.WithInsecure())
 		// 使用自定义认证
 		opts = append(opts, grpc.WithPerRPCCredentials(credential))
+	} else {
+		opts = append(opts, grpc.WithInsecure())
 	}
 	conn, err := grpc.Dial(serverAddress, opts...)
 	if err != nil {
