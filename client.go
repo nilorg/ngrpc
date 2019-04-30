@@ -38,23 +38,23 @@ func (c *Client) GetConn() *grpc.ClientConn {
 }
 
 // NewClient 创建grpc客户端
-func NewClient(serverAddress string) *Client {
-	return newClient(serverAddress, nil, nil)
+func NewClient(serverAddress string, interceptor ...grpc.UnaryClientInterceptor) *Client {
+	return newClient(serverAddress, nil, nil, interceptor...)
 }
 
 // NewClientTLSFromFile 创建grpc客户端TLSFromFile
-func NewClientTLSFromFile(serverAddress string, certFile, serverNameOverride string) *Client {
+func NewClientTLSFromFile(serverAddress string, certFile, serverNameOverride string, interceptor ...grpc.UnaryClientInterceptor) *Client {
 	// TLS连接
 	creds, err := credentials.NewClientTLSFromFile(certFile, serverNameOverride)
 	if err != nil {
 		grpclog.Fatalf("Failed to create TLS credentials %v", err)
 	}
-	return newClient(serverAddress, creds, nil)
+	return newClient(serverAddress, creds, nil, interceptor...)
 }
 
 // NewClientTLS 创建grpc客户端
-func NewClientTLS(serverAddress string, cp *x509.CertPool, serverNameOverride string) *Client {
-	return newClient(serverAddress, credentials.NewClientTLSFromCert(cp, serverNameOverride), nil)
+func NewClientTLS(serverAddress string, cp *x509.CertPool, serverNameOverride string, interceptor ...grpc.UnaryClientInterceptor) *Client {
+	return newClient(serverAddress, credentials.NewClientTLSFromCert(cp, serverNameOverride), nil, interceptor...)
 }
 
 // CustomCredential 自定义凭证
@@ -89,16 +89,16 @@ func (c CustomCredential) RequireTransportSecurity() bool {
 type GetCustomAuthenticationParameter func() (appID, appKey string)
 
 // NewClientCustomAuthentication 创建grpc客户端自定义服务验证
-func NewClientCustomAuthentication(serverAddress string, credential credentials.PerRPCCredentials) *Client {
-	return newClient(serverAddress, nil, credential)
+func NewClientCustomAuthentication(serverAddress string, credential credentials.PerRPCCredentials, interceptor ...grpc.UnaryClientInterceptor) *Client {
+	return newClient(serverAddress, nil, credential, interceptor...)
 }
 
 // NewClientTLSCustomAuthentication 创建grpc客户端TLS自定义服务验证
-func NewClientTLSCustomAuthentication(serverAddress string, cp *x509.CertPool, serverNameOverride string, credential credentials.PerRPCCredentials) *Client {
-	return newClient(serverAddress, credentials.NewClientTLSFromCert(cp, serverNameOverride), credential)
+func NewClientTLSCustomAuthentication(serverAddress string, cp *x509.CertPool, serverNameOverride string, credential credentials.PerRPCCredentials, interceptor ...grpc.UnaryClientInterceptor) *Client {
+	return newClient(serverAddress, credentials.NewClientTLSFromCert(cp, serverNameOverride), credential, interceptor...)
 }
 
-func newClient(serverAddress string, creds credentials.TransportCredentials, credential credentials.PerRPCCredentials) *Client {
+func newClient(serverAddress string, creds credentials.TransportCredentials, credential credentials.PerRPCCredentials, interceptor ...grpc.UnaryClientInterceptor) *Client {
 	var opts []grpc.DialOption
 	if creds != nil && credential != nil {
 		// 使用自定义认证
@@ -113,6 +113,9 @@ func newClient(serverAddress string, creds credentials.TransportCredentials, cre
 		opts = append(opts, grpc.WithPerRPCCredentials(credential))
 	} else {
 		opts = append(opts, grpc.WithInsecure())
+	}
+	for _, v := range interceptor {
+		opts = append(opts, grpc.WithUnaryInterceptor(v))
 	}
 	conn, err := grpc.Dial(serverAddress, opts...)
 	if err != nil {

@@ -43,41 +43,41 @@ type Server struct {
 }
 
 // NewServer 创建服务端
-func NewServer(address string) *Server {
-	return newServer(address, nil, nil)
+func NewServer(address string, interceptor ...grpc.UnaryServerInterceptor) *Server {
+	return newServer(address, nil, nil, interceptor...)
 }
 
 // NewServerTLSFromFile 创建服务端TLSFromFile
-func NewServerTLSFromFile(address string, certFile, keyFile string) *Server {
+func NewServerTLSFromFile(address string, certFile, keyFile string, interceptor ...grpc.UnaryServerInterceptor) *Server {
 	// TLS认证
 	creds, err := credentials.NewServerTLSFromFile(certFile, keyFile)
 	if err != nil {
 		grpclog.Fatalf("Failed to generate credentials %v", err)
 	}
-	return newServer(address, creds, nil)
+	return newServer(address, creds, nil, interceptor...)
 }
 
 // NewServerTLS 创建服务端TLS
-func NewServerTLS(address string, cert *tls.Certificate) *Server {
+func NewServerTLS(address string, cert *tls.Certificate, interceptor ...grpc.UnaryServerInterceptor) *Server {
 	// 实例化grpc Server, 并开启TLS认证
-	return newServer(address, credentials.NewServerTLSFromCert(cert), nil)
+	return newServer(address, credentials.NewServerTLSFromCert(cert), nil, interceptor...)
 }
 
 // ValidationFunc 验证方法
 type ValidationFunc func(appKey, appSecret string) bool
 
 // NewServerCustomAuthentication 创建服务端自定义服务验证
-func NewServerCustomAuthentication(address string, validation ValidationFunc) *Server {
-	return newServer(address, nil, validation)
+func NewServerCustomAuthentication(address string, validation ValidationFunc, interceptor ...grpc.UnaryServerInterceptor) *Server {
+	return newServer(address, nil, validation, interceptor...)
 }
 
 // NewServerTLSCustomAuthentication 创建服务端TLS自定义服务验证
-func NewServerTLSCustomAuthentication(address string, cert *tls.Certificate, validation ValidationFunc) *Server {
-	return newServer(address, credentials.NewServerTLSFromCert(cert), validation)
+func NewServerTLSCustomAuthentication(address string, cert *tls.Certificate, validation ValidationFunc, interceptor ...grpc.UnaryServerInterceptor) *Server {
+	return newServer(address, credentials.NewServerTLSFromCert(cert), validation, interceptor...)
 }
 
 // newServer 创建 grpc server
-func newServer(address string, creds credentials.TransportCredentials, validation ValidationFunc) *Server {
+func newServer(address string, creds credentials.TransportCredentials, validation ValidationFunc, interceptor ...grpc.UnaryServerInterceptor) *Server {
 	var opts []grpc.ServerOption
 	if creds != nil {
 		opts = append(opts, grpc.Creds(creds))
@@ -104,6 +104,9 @@ func newServer(address string, creds credentials.TransportCredentials, validatio
 			return handler(ctx, req)
 		})
 		opts = append(opts, unaryInterceptor)
+	}
+	for _, v := range interceptor {
+		opts = append(opts, grpc.UnaryInterceptor(v))
 	}
 	rpcServer := grpc.NewServer(opts...)
 	return &Server{
