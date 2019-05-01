@@ -19,22 +19,72 @@ package ngrpc
 import (
 	"context"
 	"crypto/x509"
+	"time"
 
+	"google.golang.org/grpc/balancer/roundrobin"
+
+	"github.com/grpc-ecosystem/go-grpc-middleware/retry"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/credentials"
 	"google.golang.org/grpc/grpclog"
 )
 
 // Client grpc客户端
 type Client struct {
-	conn          *grpc.ClientConn // 连接
-	serverAddress string
-	tls           bool
+	conn *grpc.ClientConn // 连接
+	tls  bool
 }
 
 // GetConn 获取客户端连接
 func (c *Client) GetConn() *grpc.ClientConn {
 	return c.conn
+}
+
+// NewClientWithBalancer 创建客户端使用负载均衡
+func NewClientWithBalancer(b grpc.Balancer, interceptor ...grpc.UnaryClientInterceptor) *Client {
+	opts := []grpc.DialOption{
+		grpc.WithInsecure(),
+		// 开启 grpc 中间件的重试功能
+		grpc.WithUnaryInterceptor(
+			grpc_retry.UnaryClientInterceptor(
+				grpc_retry.WithBackoff(grpc_retry.BackoffLinear(time.Duration(1)*time.Millisecond)), // 重试间隔时间
+				grpc_retry.WithMax(3), // 重试次数
+				grpc_retry.WithPerRetryTimeout(time.Duration(5)*time.Millisecond), // 重试时间
+				// 返回码为如下值时重试
+				grpc_retry.WithCodes(codes.ResourceExhausted, codes.Unavailable, codes.DeadlineExceeded),
+			),
+		),
+		// 负载均衡
+		grpc.WithBalancer(b),
+	}
+	conn, err := grpc.Dial("", opts...)
+	if err != nil {
+		grpclog.Errorln(err)
+	}
+	return &Client{
+		conn: conn,
+		tls:  false,
+	}
+}
+
+// NewClientWithBalancerName 创建客户端使用负载均衡
+func NewClientWithBalancerName(ctx context.Context, target string, interceptor ...grpc.UnaryClientInterceptor) *Client {
+	opts := []grpc.DialOption{
+		// 使用withBlock 但是不使用超时的话会不断的重试下去。
+		grpc.WithBlock(),
+		grpc.WithInsecure(),
+		// 负载均衡
+		grpc.WithBalancerName(roundrobin.Name),
+	}
+	conn, err := grpc.DialContext(ctx, target, opts...)
+	if err != nil {
+		grpclog.Errorln(err)
+	}
+	return &Client{
+		conn: conn,
+		tls:  false,
+	}
 }
 
 // NewClient 创建grpc客户端
@@ -122,9 +172,8 @@ func newClient(serverAddress string, creds credentials.TransportCredentials, cre
 		grpclog.Errorln(err)
 	}
 	return &Client{
-		conn:          conn,
-		serverAddress: serverAddress,
-		tls:           creds != nil,
+		conn: conn,
+		tls:  creds != nil,
 	}
 }
 
