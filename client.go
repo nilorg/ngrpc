@@ -58,6 +58,9 @@ func NewClientWithBalancer(b grpc.Balancer, interceptor ...grpc.UnaryClientInter
 		// 负载均衡
 		grpc.WithBalancer(b),
 	}
+	for _, v := range interceptor {
+		opts = append(opts, grpc.WithUnaryInterceptor(v))
+	}
 	conn, err := grpc.Dial("", opts...)
 	if err != nil {
 		grpclog.Errorln(err)
@@ -76,6 +79,9 @@ func NewClientWithBalancerName(ctx context.Context, target string, interceptor .
 		grpc.WithInsecure(),
 		// 负载均衡
 		grpc.WithBalancerName(roundrobin.Name),
+	}
+	for _, v := range interceptor {
+		opts = append(opts, grpc.WithUnaryInterceptor(v))
 	}
 	conn, err := grpc.DialContext(ctx, target, opts...)
 	if err != nil {
