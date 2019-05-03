@@ -28,8 +28,8 @@ import (
 )
 
 var (
-	// TracingComponentTag 跟踪组件标签
-	TracingComponentTag = opentracing.Tag{Key: string(ext.Component), Value: "gRPC"}
+	// ComponentTag 跟踪组件标签
+	ComponentTag = opentracing.Tag{Key: string(ext.Component), Value: "gRPC"}
 )
 
 // OpenTracingClientInterceptor 重写客户端解析器（透传数据traceId等）
@@ -49,7 +49,7 @@ func OpenTracingClientInterceptor(tracer opentracing.Tracer) grpc.UnaryClientInt
 		cliSpan := tracer.StartSpan(
 			method,
 			opentracing.ChildOf(parentCtx),
-			TracingComponentTag,
+			ComponentTag,
 			ext.SpanKindRPCClient,
 		)
 
@@ -93,7 +93,7 @@ func OpentracingServerInterceptor(tracer opentracing.Tracer) grpc.UnaryServerInt
 		serverSpan := tracer.StartSpan(
 			info.FullMethod,
 			ext.RPCServerOption(spanContext),
-			TracingComponentTag,
+			ComponentTag,
 			ext.SpanKindRPCServer,
 		)
 		defer serverSpan.Finish()
