@@ -51,6 +51,9 @@ type eventFunc func()
 // LocalIPFunc 获取本地IP函数
 type LocalIPFunc func() string
 
+// ServiceFunc 服务注册函数
+type ServiceRegisterFunc func(s *grpc.Server)
+
 // Server 服务端
 type Server struct {
 	ServiceName       string
@@ -58,12 +61,16 @@ type Server struct {
 	tls               bool
 	startBeforeEvents []eventFunc
 	startAfterEvents  []eventFunc
+	services          []ServiceRegisterFunc
 	rpcServer         *grpc.Server
 }
 
 func (s *Server) startBefore() {
 	for i := 0; i < len(s.startBeforeEvents); i++ {
 		s.startBeforeEvents[i]()
+	}
+	for i := 0; i < len(s.services); i++ {
+		s.services[i](s.rpcServer)
 	}
 }
 
@@ -80,8 +87,8 @@ func getPort(address string) int {
 }
 
 // RegisterService 注册服务
-func (s *Server) RegisterService(services ...eventFunc) {
-	s.startBeforeEvents = append(s.startBeforeEvents, services...)
+func (s *Server) RegisterService(services ...ServiceRegisterFunc) {
+	s.services = append(s.services, services...)
 }
 
 // RegisterConsul 注册Consul
@@ -185,6 +192,7 @@ func newServer(address string, creds credentials.TransportCredentials, validatio
 func (s *Server) Start() {
 	s.startBefore()
 	defer s.startAfter()
+
 	lis, err := net.Listen("tcp", s.address)
 	if err != nil {
 		grpclog.Fatalf("grpc failed to listen: %v", err)
