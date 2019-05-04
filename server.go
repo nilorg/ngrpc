@@ -20,6 +20,12 @@ import (
 	"context"
 	"crypto/tls"
 	"net"
+	"regexp"
+	"strconv"
+
+	"github.com/nilorg/pkg/consul/register"
+
+	"github.com/nilorg/pkg/consul"
 
 	"google.golang.org/grpc/codes"
 	"google.golang.org/grpc/metadata"
@@ -31,15 +37,65 @@ import (
 )
 
 var (
+	portRegexp = regexp.MustCompile(`:[0-65535]{1,5}`)
+	// LocalIP 本地IP
+	LocalIP LocalIPFunc = consul.LocalIP
 	// defaultServer 默认server
 	defaultServer *Server
 )
 
+// eventFunc 事件函数
+type eventFunc func()
+
+// LocalIPFunc 获取本地IP函数
+type LocalIPFunc func() string
+
 // Server 服务端
 type Server struct {
-	address   string
-	tls       bool
-	rpcServer *grpc.Server
+	ServiceName       string
+	address           string
+	tls               bool
+	startBeforeEvents []eventFunc
+	startAfterEvents  []eventFunc
+	rpcServer         *grpc.Server
+}
+
+func (s *Server) startBefore() {
+	for i := 0; i < len(s.startBeforeEvents); i++ {
+		s.startBeforeEvents[i]()
+	}
+}
+
+func (s *Server) startAfter() {
+	for i := 0; i < len(s.startAfterEvents); i++ {
+		s.startAfterEvents[i]()
+	}
+}
+
+func getPort(address string) int {
+	s := portRegexp.FindString(address)
+	port, _ := strconv.Atoi(s[1:])
+	return port
+}
+
+// RegisterConsul 注册Consul
+func (s *Server) RegisterConsul(consulServerAddr string, sInfo *register.ServiceInfo) {
+	s.startBeforeEvents = append(s.startBeforeEvents, func() {
+		consul.RegisterHealthServer(s.rpcServer, s.ServiceName)
+	})
+	s.startAfterEvents = append(s.startAfterEvents, func() {
+		if sInfo == nil {
+			sInfo := register.NewServiceInfo()
+			sInfo.Name = s.ServiceName
+			sInfo.Tags = []string{}
+			sInfo.IP = LocalIP()
+			sInfo.Port = getPort(s.address)
+		}
+		err := register.Register(consulServerAddr, sInfo)
+		if err != nil {
+			grpclog.Errorf("consul服务注册错误：%s", err)
+		}
+	})
 }
 
 // NewServer 创建服务端
@@ -118,6 +174,8 @@ func newServer(address string, creds credentials.TransportCredentials, validatio
 
 // Start 启动
 func (s *Server) Start() {
+	s.startBefore()
+	defer s.startAfter()
 	lis, err := net.Listen("tcp", s.address)
 	if err != nil {
 		grpclog.Fatalf("grpc failed to listen: %v", err)
