@@ -19,6 +19,7 @@ package ngrpc
 import (
 	"context"
 	"crypto/tls"
+	"errors"
 	"net"
 	"regexp"
 	"strconv"
@@ -80,6 +81,9 @@ func getPort(address string) int {
 
 // RegisterConsul 注册Consul
 func (s *Server) RegisterConsul(consulServerAddr string, sInfo *register.ServiceInfo) {
+	if s.ServiceName == "" {
+		panic(errors.New("register consul service name be empty"))
+	}
 	s.startBeforeEvents = append(s.startBeforeEvents, func() {
 		consul.RegisterHealthServer(s.rpcServer, s.ServiceName)
 	})
