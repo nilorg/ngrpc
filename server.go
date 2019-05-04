@@ -51,7 +51,7 @@ type eventFunc func()
 // LocalIPFunc 获取本地IP函数
 type LocalIPFunc func() string
 
-// ServiceFunc 服务注册函数
+// ServiceRegisterFunc 服务注册函数
 type ServiceRegisterFunc func(s *grpc.Server)
 
 // Server 服务端
