@@ -79,6 +79,11 @@ func getPort(address string) int {
 	return port
 }
 
+// RegisterService 注册服务
+func (s *Server) RegisterService(services ...eventFunc) {
+	s.startBeforeEvents = append(s.startBeforeEvents, services...)
+}
+
 // RegisterConsul 注册Consul
 func (s *Server) RegisterConsul(consulServerAddr string, sInfo *register.ServiceInfo) {
 	if s.ServiceName == "" {
@@ -89,7 +94,7 @@ func (s *Server) RegisterConsul(consulServerAddr string, sInfo *register.Service
 	})
 	s.startAfterEvents = append(s.startAfterEvents, func() {
 		if sInfo == nil {
-			sInfo := register.NewServiceInfo()
+			sInfo = register.NewServiceInfo()
 			sInfo.Name = s.ServiceName
 			sInfo.Tags = []string{}
 			sInfo.IP = LocalIP()
