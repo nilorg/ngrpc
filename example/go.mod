@@ -1,5 +1,8 @@
 module github.com/nilorg/ngrpc/example
 
+
+go 1.13
+
 require (
 	github.com/golang/protobuf v1.2.0
 	github.com/nilorg/ngrpc v0.0.0-20190331015715-e9a7716c9af3
