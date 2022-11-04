@@ -1,4 +1,4 @@
-module github.com/nilorg/ngrpc
+module github.com/nilorg/ngrpc/v2
 
 go 1.18
 
