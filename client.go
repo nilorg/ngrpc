@@ -1,11 +1,9 @@
 package ngrpc
 
 import (
-	"fmt"
+	"context"
 	"time"
 
-	"github.com/nilorg/sdk/log"
-	"github.com/sirupsen/logrus"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/credentials/insecure"
 	"google.golang.org/grpc/keepalive"
@@ -13,9 +11,8 @@ import (
 
 // GrpcClient grpc客户端
 type GrpcClient struct {
-	serviceName string
-	conn        *grpc.ClientConn // 连接
-	Log         log.Logger
+	conn *grpc.ClientConn // 连接
+	opts ClientOptions
 }
 
 // GetConn 获取客户端连接
@@ -24,48 +21,66 @@ func (c *GrpcClient) GetConn() *grpc.ClientConn {
 }
 
 // Close 关闭
-func (c *GrpcClient) Close() {
+func (c *GrpcClient) Close(ctx context.Context) {
 	if c.conn == nil {
-		c.Log.Warningf("close %s grpc client is nil", c.serviceName)
+		c.opts.Log.Fatalf(ctx, "close %s grpc client is nil", c.opts.Address)
 		return
 	}
 	err := c.conn.Close()
 	if err != nil {
-		c.Log.Errorf("close %s grpc client: %v", err)
+		c.opts.Log.Fatalf(ctx, "close %s grpc client: %v", c.opts.Address, err)
 		return
+	}
+	if c.opts.discovery != nil {
+		err = c.opts.discovery.Close()
+		if err != nil {
+			c.opts.Log.Fatalf(ctx, "close %s grpc client: %v", c.opts.Address, err)
+			return
+		}
 	}
 }
 
 // NewGrpcClient 创建Grpc客户端
-func NewGrpcClient(serviceName string, port int, streamClientInterceptors []grpc.StreamClientInterceptor, unaryClientInterceptors []grpc.UnaryClientInterceptor) *GrpcClient {
-	opts := []grpc.DialOption{
+func NewGrpcClient(ctx context.Context, opts ...ClientOption) *GrpcClient {
+	client := new(GrpcClient)
+	client.opts = NewClientOptions(opts...)
+	grpcClientOptions := []grpc.DialOption{
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(
 			keepalive.ClientParameters{
 				Time:                10 * time.Second,
-				Timeout:             100 * time.Millisecond,
+				Timeout:             10 * time.Second,
 				PermitWithoutStream: true,
 			},
 		),
 	}
-	if len(streamClientInterceptors) > 0 {
-		for _, v := range streamClientInterceptors {
-			opts = append(opts, grpc.WithStreamInterceptor(v))
+	if len(client.opts.StreamClientInterceptors) > 0 {
+		for _, v := range client.opts.StreamClientInterceptors {
+			grpcClientOptions = append(grpcClientOptions, grpc.WithStreamInterceptor(v))
 		}
 	}
-	if len(unaryClientInterceptors) > 0 {
-		for _, v := range unaryClientInterceptors {
-			opts = append(opts, grpc.WithUnaryInterceptor(v))
+	if len(client.opts.UnaryClientInterceptors) > 0 {
+		for _, v := range client.opts.UnaryClientInterceptors {
+			grpcClientOptions = append(grpcClientOptions, grpc.WithUnaryInterceptor(v))
 		}
 	}
-
-	conn, err := grpc.Dial(fmt.Sprintf("%s:%d", serviceName, port), opts...)
-	if err != nil {
-		logrus.Errorf("%s grpc client dial error: %v", serviceName, err)
+	if client.opts.discovery != nil {
+		builder, err := client.opts.discovery.Discover(client.opts.Name)
+		if err != nil {
+			client.opts.Log.Fatalf(ctx, "%s grpc client discovery error: %v", client.opts.Name, err)
+		}
+		grpcClientOptions = append(grpcClientOptions, grpc.WithResolvers(builder))
+		conn, err := grpc.Dial(client.opts.discovery.Address(), grpcClientOptions...)
+		if err != nil {
+			client.opts.Log.Fatalf(ctx, "%s grpc client dial error: %v", client.opts.Name, err)
+		}
+		client.conn = conn
+	} else {
+		conn, err := grpc.Dial(client.opts.Address, grpcClientOptions...)
+		if err != nil {
+			client.opts.Log.Fatalf(ctx, "%s grpc client dial error: %v", client.opts.Name, err)
+		}
+		client.conn = conn
 	}
-	return &GrpcClient{
-		serviceName: serviceName,
-		conn:        conn,
-		Log:         logrus.StandardLogger(),
-	}
+	return client
 }

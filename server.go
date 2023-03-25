@@ -1,21 +1,21 @@
 package ngrpc
 
 import (
+	"context"
+	"fmt"
 	"net"
 
 	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
-	"github.com/nilorg/pkg/logger"
-	"github.com/nilorg/sdk/log"
+	"github.com/nilorg/ngrpc/v2/resolver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
 )
 
 // GrpcServer 服务端
 type GrpcServer struct {
-	serviceName string
-	address     string
-	server      *grpc.Server
-	Log         log.Logger
+	server *grpc.Server
+	opts   ServerOptions
+	ctx    context.Context
 }
 
 // GetSrv 获取rpc server
@@ -28,53 +28,75 @@ func (s *GrpcServer) register() {
 	reflection.Register(s.server)
 }
 
-// Run ...
 func (s *GrpcServer) Run() {
 	s.register()
-
-	lis, err := net.Listen("tcp", s.address)
+	var address string
+	if s.opts.RandomPort {
+		address = ":0"
+	} else {
+		address = s.opts.Address
+	}
+	lis, err := net.Listen("tcp", address)
 	if err != nil {
-		s.Log.Errorf("%s grpc server failed to listen: %v", s.serviceName, err)
+		s.opts.Log.Fatalf(s.ctx, "%s grpc server failed to listen: %v", s.opts.Name, err)
 		return
 	}
+	if s.opts.register != nil {
+		serviceInfo := resolver.NewServiceInfo()
+		serviceInfo.Name = s.opts.Name
+		if s.opts.RandomPort {
+			ipAddr, err := LocalIPv4()
+			if err != nil {
+				s.opts.Log.Fatalf(s.ctx, "LocalIPv4: %s", err)
+				return
+			}
+			port := lis.Addr().(*net.TCPAddr).Port
+			serviceInfo.Address = fmt.Sprintf("%s:%d", ipAddr, port)
+		} else {
+			serviceInfo.Address = address
+		}
+		err = s.opts.register.Register(serviceInfo)
+		if err != nil {
+			s.opts.Log.Fatalf(s.ctx, "%s grpc server failed to register: %v", s.opts.Name, err)
+		}
+	}
 	if err := s.server.Serve(lis); err != nil {
-		s.Log.Errorf("%s grpc server failed to serve: %v", s.serviceName, err)
+		s.opts.Log.Fatalf(s.ctx, "%s grpc server failed to serve: %v", s.opts.Name, err)
 	}
 }
 
-// Start 启动
 func (s *GrpcServer) Start() {
 	go func() {
 		s.Run()
 	}()
 }
 
-// Stop ...
 func (s *GrpcServer) Stop() {
 	if s.server == nil {
-		s.Log.Warningf("stop %s grpc server is nil", s.serviceName)
-		return
+		s.opts.Log.Warnf(s.ctx, "stop %s grpc server is nil", s.opts.Name)
+	} else {
+		s.server.Stop()
 	}
-	s.server.Stop()
+	if s.opts.register != nil {
+		err := s.opts.register.Close()
+		if err != nil {
+			s.opts.Log.Errorf(s.ctx, "%s grpc server failed to unregister: %v", s.opts.Name, err)
+		}
+	}
 }
 
 // NewGrpcServer 创建Grpc服务端
-func NewGrpcServer(name string, address string, streamServerInterceptors []grpc.StreamServerInterceptor, unaryServerInterceptors []grpc.UnaryServerInterceptor) *GrpcServer {
-	var opts []grpc.ServerOption
-	if len(streamServerInterceptors) > 0 {
-		opts = append(opts, grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(streamServerInterceptors...)))
+func NewGrpcServer(ctx context.Context, opts ...ServerOption) *GrpcServer {
+	server := new(GrpcServer)
+	server.ctx = ctx
+	server.opts = NewServerOptions(opts...)
+	var grpcServerOptions []grpc.ServerOption
+	if len(server.opts.StreamServerInterceptors) > 0 {
+		grpcServerOptions = append(grpcServerOptions, grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(server.opts.StreamServerInterceptors...)))
 	}
-	if len(unaryServerInterceptors) > 0 {
-		opts = append(opts, grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(unaryServerInterceptors...)))
+	if len(server.opts.UnaryServerInterceptors) > 0 {
+		grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(server.opts.UnaryServerInterceptors...)))
 	}
-	server := grpc.NewServer(opts...)
-	if logger.Default() == nil {
-		logger.Init()
-	}
-	return &GrpcServer{
-		serviceName: name,
-		server:      server,
-		address:     address,
-		Log:         logger.Default(),
-	}
+	server.server = grpc.NewServer(grpcServerOptions...)
+	return server
 }
