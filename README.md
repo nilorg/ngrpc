@@ -2,7 +2,7 @@
 
 [![Go Report Card](https://goreportcard.com/badge/github.com/nilorg/ngrpc/v2)](https://goreportcard.com/report/github.com/nilorg/ngrpc/v2)
 [![GoDoc](https://godoc.org/github.com/nilorg/ngrpc/v2?status.svg)](https://godoc.org/github.com/nilorg/ngrpc/v2)
-[![License](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![License](https://img.shields.io/badge/license-Apache%202.0-blue.svg)](LICENSE)
 
 一个功能丰富的 gRPC 服务端/客户端包装库，提供简化的 gRPC 服务开发体验。
 
@@ -86,7 +86,7 @@ server := ngrpc.NewGrpcServer(ctx,
     ngrpc.WithServerName("my-service"),           // 服务名称
     ngrpc.WithServerAddress(":8080"),             // 监听地址
     ngrpc.WithServerRandomPort(true),             // 随机端口
-    ngrpc.WithServerLog(customLogger),            // 自定义日志
+    ngrpc.WithServerLogger(customLogger),         // 自定义日志
     ngrpc.WithServerRegistry(etcdRegistry),       // 服务注册
 )
 ```
@@ -96,7 +96,7 @@ server := ngrpc.NewGrpcServer(ctx,
 ```go
 client := ngrpc.NewGrpcClient(ctx,
     ngrpc.WithClientAddress("localhost:8080"),    // 服务地址
-    ngrpc.WithClientLog(customLogger),            // 自定义日志
+    ngrpc.WithClientLogger(customLogger),         // 自定义日志
     ngrpc.WithClientDiscovery(etcdDiscovery),     // 服务发现
 )
 ```
@@ -167,17 +167,68 @@ server := ngrpc.NewGrpcServer(ctx,
 
 ```go
 type Logger interface {
-    Fatalf(ctx context.Context, format string, args ...interface{})
+	Debugf(ctx context.Context, format string, args ...interface{})
+	Debugln(ctx context.Context, args ...interface{})
+	Infof(ctx context.Context, format string, args ...interface{})
+	Infoln(ctx context.Context, args ...interface{})
+	Warnf(ctx context.Context, format string, args ...interface{})
+	Warnln(ctx context.Context, args ...interface{})
+	Errorf(ctx context.Context, format string, args ...interface{})
+	Errorln(ctx context.Context, args ...interface{})
+	Fatalf(ctx context.Context, format string, args ...interface{})
+	Fatalln(ctx context.Context, args ...interface{})
 }
 
 type MyLogger struct{}
 
-func (l *MyLogger) Fatalf(ctx context.Context, format string, args ...interface{}) {
-    // 自定义日志实现
+func (l *MyLogger) Debugf(ctx context.Context, format string, args ...interface{}) {
+    // 实现 Debug 级别日志
 }
 
+func (l *MyLogger) Debugln(ctx context.Context, args ...interface{}) {
+    // 实现 Debug 级别日志（换行）
+}
+
+func (l *MyLogger) Infof(ctx context.Context, format string, args ...interface{}) {
+    // 实现 Info 级别日志
+}
+
+func (l *MyLogger) Infoln(ctx context.Context, args ...interface{}) {
+    // 实现 Info 级别日志（换行）
+}
+
+func (l *MyLogger) Warnf(ctx context.Context, format string, args ...interface{}) {
+    // 实现 Warn 级别日志
+}
+
+func (l *MyLogger) Warnln(ctx context.Context, args ...interface{}) {
+    // 实现 Warn 级别日志（换行）
+}
+
+func (l *MyLogger) Errorf(ctx context.Context, format string, args ...interface{}) {
+    // 实现 Error 级别日志
+}
+
+func (l *MyLogger) Errorln(ctx context.Context, args ...interface{}) {
+    // 实现 Error 级别日志（换行）
+}
+
+func (l *MyLogger) Fatalf(ctx context.Context, format string, args ...interface{}) {
+    // 实现 Fatal 级别日志
+}
+
+func (l *MyLogger) Fatalln(ctx context.Context, args ...interface{}) {
+    // 实现 Fatal 级别日志（换行）
+}
+
+// 在服务端使用自定义日志
 server := ngrpc.NewGrpcServer(ctx,
-    ngrpc.WithServerLog(&MyLogger{}),
+    ngrpc.WithServerLogger(&MyLogger{}),
+)
+
+// 在客户端使用自定义日志
+client := ngrpc.NewGrpcClient(ctx,
+    ngrpc.WithClientLogger(&MyLogger{}),
 )
 ```
 
@@ -189,7 +240,7 @@ server := ngrpc.NewGrpcServer(ctx,
 
 ## 许可证
 
-本项目采用 MIT 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
+本项目采用 Apache License 2.0 许可证 - 查看 [LICENSE](LICENSE) 文件了解详情。
 
 ## 贡献
 
