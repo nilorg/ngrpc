@@ -48,7 +48,7 @@ func NewGrpcClient(ctx context.Context, opts ...ClientOption) *GrpcClient {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(
 			keepalive.ClientParameters{
-				Time:                60 * time.Second, // 每60秒ping一次
+				Time:                2 * time.Minute,  // 每2分钟发送一次 ping
 				Timeout:             10 * time.Second, // 超过10秒无响应就断开
 				PermitWithoutStream: true,             // 即使没有 RPC 也发送 ping
 			},
@@ -63,6 +63,9 @@ func NewGrpcClient(ctx context.Context, opts ...ClientOption) *GrpcClient {
 		for _, v := range client.opts.UnaryClientInterceptors {
 			grpcClientOptions = append(grpcClientOptions, grpc.WithUnaryInterceptor(v))
 		}
+	}
+	if len(client.opts.dialOptions) > 0 {
+		grpcClientOptions = append(grpcClientOptions, client.opts.dialOptions...)
 	}
 	if client.opts.discovery != nil {
 		builder, err := client.opts.discovery.Discover(client.opts.Name)

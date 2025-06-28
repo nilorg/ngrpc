@@ -89,6 +89,7 @@ type ClientOptions struct {
 	StreamClientInterceptors []grpc.StreamClientInterceptor
 	UnaryClientInterceptors  []grpc.UnaryClientInterceptor
 	discovery                resolver.Discovery
+	dialOptions              []grpc.DialOption
 }
 
 // ClientOption 为可选参数赋值的函数
@@ -140,5 +141,11 @@ func WithClientUnaryClientInterceptors(unaryClientInterceptors ...grpc.UnaryClie
 func WithClientDiscovery(discovery resolver.Discovery) ClientOption {
 	return func(o *ClientOptions) {
 		o.discovery = discovery
+	}
+}
+
+func WithClientDialOptions(dialOptions ...grpc.DialOption) ClientOption {
+	return func(o *ClientOptions) {
+		o.dialOptions = dialOptions
 	}
 }
