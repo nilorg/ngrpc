@@ -48,9 +48,9 @@ func NewGrpcClient(ctx context.Context, opts ...ClientOption) *GrpcClient {
 		grpc.WithTransportCredentials(insecure.NewCredentials()),
 		grpc.WithKeepaliveParams(
 			keepalive.ClientParameters{
-				Time:                10 * time.Second,
-				Timeout:             10 * time.Second,
-				PermitWithoutStream: true,
+				Time:                60 * time.Second, // 每60秒ping一次
+				Timeout:             10 * time.Second, // 超过10秒无响应就断开
+				PermitWithoutStream: true,             // 即使没有 RPC 也发送 ping
 			},
 		),
 	}
