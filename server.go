@@ -5,7 +5,6 @@ import (
 	"fmt"
 	"net"
 
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"github.com/nilorg/ngrpc/v2/resolver"
 	"google.golang.org/grpc"
 	"google.golang.org/grpc/reflection"
@@ -92,10 +91,10 @@ func NewGrpcServer(ctx context.Context, opts ...ServerOption) *GrpcServer {
 	server.opts = NewServerOptions(opts...)
 	var grpcServerOptions []grpc.ServerOption
 	if len(server.opts.StreamServerInterceptors) > 0 {
-		grpcServerOptions = append(grpcServerOptions, grpc.StreamInterceptor(grpc_middleware.ChainStreamServer(server.opts.StreamServerInterceptors...)))
+		grpcServerOptions = append(grpcServerOptions, grpc.ChainStreamInterceptor(server.opts.StreamServerInterceptors...))
 	}
 	if len(server.opts.UnaryServerInterceptors) > 0 {
-		grpcServerOptions = append(grpcServerOptions, grpc.UnaryInterceptor(grpc_middleware.ChainUnaryServer(server.opts.UnaryServerInterceptors...)))
+		grpcServerOptions = append(grpcServerOptions, grpc.ChainUnaryInterceptor(server.opts.UnaryServerInterceptors...))
 	}
 	server.server = grpc.NewServer(grpcServerOptions...)
 	return server

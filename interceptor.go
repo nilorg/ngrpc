@@ -3,7 +3,6 @@ package ngrpc
 import (
 	"context"
 
-	grpc_middleware "github.com/grpc-ecosystem/go-grpc-middleware"
 	"google.golang.org/grpc"
 )
 
@@ -21,8 +20,30 @@ func UnaryServerInterceptor(f GrpcContextHandler) grpc.UnaryServerInterceptor {
 // StreamServerInterceptor ...
 func StreamServerInterceptor(f GrpcContextHandler) grpc.StreamServerInterceptor {
 	return func(srv interface{}, stream grpc.ServerStream, info *grpc.StreamServerInfo, handler grpc.StreamHandler) error {
-		wrapped := grpc_middleware.WrapServerStream(stream)
+		wrapped := WrapServerStream(stream)
 		wrapped.WrappedContext = f(stream.Context())
 		return handler(srv, wrapped)
 	}
+}
+
+// WrappedServerStream is a thin wrapper around grpc.ServerStream that allows modifying context.
+// Copied from github.com/grpc-ecosystem/go-grpc-middleware/v2
+type WrappedServerStream struct {
+	grpc.ServerStream
+	// WrappedContext is the wrapper's own Context. You can assign it.
+	WrappedContext context.Context
+}
+
+// Context returns the wrapper's WrappedContext, overwriting the nested grpc.ServerStream.Context()
+func (w *WrappedServerStream) Context() context.Context {
+	return w.WrappedContext
+}
+
+// WrapServerStream returns a ServerStream that has the ability to overwrite context.
+// Copied from github.com/grpc-ecosystem/go-grpc-middleware/v2
+func WrapServerStream(stream grpc.ServerStream) *WrappedServerStream {
+	if existing, ok := stream.(*WrappedServerStream); ok {
+		return existing
+	}
+	return &WrappedServerStream{ServerStream: stream, WrappedContext: stream.Context()}
 }

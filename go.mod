@@ -3,7 +3,6 @@ module github.com/nilorg/ngrpc/v2
 go 1.24.0
 
 require (
-	github.com/grpc-ecosystem/go-grpc-middleware v1.4.0
 	go.etcd.io/etcd/client/v3 v3.6.7
 	google.golang.org/grpc v1.78.0
 	google.golang.org/protobuf v1.36.11
