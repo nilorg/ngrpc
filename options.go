@@ -2,9 +2,11 @@ package ngrpc
 
 import (
 	"os"
+	"time"
 
 	"github.com/nilorg/ngrpc/v2/resolver"
 	"google.golang.org/grpc"
+	"google.golang.org/grpc/keepalive"
 )
 
 // ServerOptions 可选参数列表
@@ -16,6 +18,8 @@ type ServerOptions struct {
 	UnaryServerInterceptors  []grpc.UnaryServerInterceptor
 	register                 resolver.Registry
 	RandomPort               bool
+	KeepaliveParams          keepalive.ServerParameters
+	KeepaliveEnforcement     keepalive.EnforcementPolicy
 }
 
 // ServerOption 为可选参数赋值的函数
@@ -78,6 +82,30 @@ func WithServerRegister(register resolver.Registry) ServerOption {
 func WithServerRandomPort(randomPort bool) ServerOption {
 	return func(o *ServerOptions) {
 		o.RandomPort = randomPort
+	}
+}
+
+// WithServerKeepaliveParams 设置 gRPC keepalive 服务端参数
+// time: 客户端 ping 的最小间隔，默认 5 分钟
+// timeout: 服务端等待 ping 响应的超时，默认 20 秒
+func WithServerKeepaliveParams(time, timeout time.Duration) ServerOption {
+	return func(o *ServerOptions) {
+		o.KeepaliveParams = keepalive.ServerParameters{
+			Time:    time,
+			Timeout: timeout,
+		}
+	}
+}
+
+// WithServerKeepaliveEnforcement 设置 gRPC keepalive 服务端强制策略
+// minTime: 允许客户端 ping 的最小间隔，默认 5 分钟
+// permitWithoutStream: 是否允许无活跃流时 ping
+func WithServerKeepaliveEnforcement(minTime time.Duration, permitWithoutStream bool) ServerOption {
+	return func(o *ServerOptions) {
+		o.KeepaliveEnforcement = keepalive.EnforcementPolicy{
+			MinTime:             minTime,
+			PermitWithoutStream: permitWithoutStream,
+		}
 	}
 }
 

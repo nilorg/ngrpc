@@ -17,13 +17,13 @@ type GrpcServer struct {
 	ctx    context.Context
 }
 
-// GetSrv 获取rpc server
+// GetSrv 获取 rpc server
 func (s *GrpcServer) GetSrv() *grpc.Server {
 	return s.server
 }
 
 func (s *GrpcServer) register() {
-	// 在gRPC服务器上注册反射服务。
+	// 在 gRPC 服务器上注册反射服务。
 	reflection.Register(s.server)
 }
 
@@ -84,7 +84,7 @@ func (s *GrpcServer) Stop() {
 	}
 }
 
-// NewGrpcServer 创建Grpc服务端
+// NewGrpcServer 创建 Grpc 服务端
 func NewGrpcServer(ctx context.Context, opts ...ServerOption) *GrpcServer {
 	server := new(GrpcServer)
 	server.ctx = ctx
@@ -95,6 +95,13 @@ func NewGrpcServer(ctx context.Context, opts ...ServerOption) *GrpcServer {
 	}
 	if len(server.opts.UnaryServerInterceptors) > 0 {
 		grpcServerOptions = append(grpcServerOptions, grpc.ChainUnaryInterceptor(server.opts.UnaryServerInterceptors...))
+	}
+	// 配置 keepalive 参数（修复 GoAway too_many_pings 错误）
+	if server.opts.KeepaliveParams.Time > 0 {
+		grpcServerOptions = append(grpcServerOptions, grpc.KeepaliveParams(server.opts.KeepaliveParams))
+	}
+	if server.opts.KeepaliveEnforcement.MinTime > 0 {
+		grpcServerOptions = append(grpcServerOptions, grpc.KeepaliveEnforcementPolicy(server.opts.KeepaliveEnforcement))
 	}
 	server.server = grpc.NewServer(grpcServerOptions...)
 	return server
